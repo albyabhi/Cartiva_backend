@@ -1,8 +1,12 @@
 import axios from 'axios';
 import Product from '../Schemas/Product.js';
+import dotenv from 'dotenv';
+dotenv.config();
 
-const BOT_TOKEN = '8063201137:AAHBhq2YQAcYAvRQDxQSg7_4jwI7rzrc_y0';
-const CHAT_ID = -4973032930;
+
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const CHAT_ID = process.env.CHAT_ID;
+
 
 async function sendProductToTelegram(product) {
   const caption = `🔥 *${product.title}*\n` +
