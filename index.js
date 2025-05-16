@@ -22,7 +22,7 @@ app.use(express.json());
 // Routes
 app.use('/product', Product);
 
-cron.schedule('0 6,18 * * *', async () => {
+cron.schedule('0 1,6,9,12,15,18,21 * * *', async () => {
   console.log('\n⏰ Scheduled fetch started...');
   try {
     await fetchAmazonDeals();
