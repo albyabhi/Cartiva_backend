@@ -42,8 +42,10 @@ router.post("/add-product", async (req, res) => {
     const originalStr =
       $(".priceBlockStrikePriceString").text().trim() || priceStr;
 
-    const price = parseFloat(priceStr.replace(/[₹,]/g, ""));
-    let originalPrice = parseFloat(originalStr.replace(/[₹,]/g, ""));
+    const price = Math.round(parseFloat(priceStr.replace(/[₹,]/g, "")));
+    let originalPrice = Math.round(
+      parseFloat(originalStr.replace(/[₹,]/g, ""))
+    );
 
     // ✅ Validate price
     if (!price || isNaN(price)) {
@@ -139,12 +141,10 @@ router.delete("/delete-product/:id", async (req, res) => {
       JSON.stringify(deletedProduct, null, 2)
     );
 
-    res
-      .status(200)
-      .json({
-        message: "✅ Product deleted successfully",
-        data: deletedProduct,
-      });
+    res.status(200).json({
+      message: "✅ Product deleted successfully",
+      data: deletedProduct,
+    });
   } catch (error) {
     console.error("❌ Error deleting product:", error.message);
     res.status(500).json({ error: "Failed to delete product" });
