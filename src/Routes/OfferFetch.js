@@ -26,9 +26,10 @@ const BACKEND_API = `${process.env.BACKEND_URL}/product/add-product`;
 const categories = [
   { name: 'Electronics', url: 'https://www.amazon.in/s?i=electronics' },
   { name: 'Mobile Phones & Accessories', url: 'https://www.amazon.in/s?i=mobile' },
-  { name: 'Books', url: 'https://www.amazon.in/s?i=stripbooks' },
   { name: 'Home & Kitchen', url: 'https://www.amazon.in/s?i=garden' },
   { name: 'Fashion', url: 'https://www.amazon.in/s?i=fashion' },
+  { name: "Men's Wear", url: 'https://www.amazon.in/s?i=fashion&rh=n%3A1968024031' },
+  { name: "Ladies' Wear", url: 'https://www.amazon.in/s?i=fashion&rh=n%3A1968023031' },
   { name: 'Beauty & Personal Care', url: 'https://www.amazon.in/s?i=beauty' },
   { name: 'Toys & Games', url: 'https://www.amazon.in/s?i=toys-and-games' },
   { name: 'Sports & Outdoors', url: 'https://www.amazon.in/s?i=sports' },

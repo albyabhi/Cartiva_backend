@@ -7,6 +7,11 @@ dotenv.config();
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const CHAT_ID = process.env.CHAT_ID;
 
+function escapeMarkdown(text) {
+  return text.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
+}
+
+
 
 async function sendProductToTelegram(product) {
   const caption = `🔥 *${escapeMarkdown(product.title)}*\n` +
