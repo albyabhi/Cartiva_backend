@@ -1,7 +1,11 @@
 import express from 'express';
 const router = express.Router();
-import puppeteer from 'puppeteer';
+import axios from 'axios';
+
+import * as cheerio from 'cheerio'; 
 import Product from '../Schemas/Product.js';
+
+
 
 const AFFILIATE_TAG = 'cartiva-21';
 
@@ -19,43 +23,55 @@ router.post('/add-product', async (req, res) => {
   }
 
   try {
-    const browser = await puppeteer.launch({ headless: 'new' });
-    const page = await browser.newPage();
-    await page.goto(url, { waitUntil: 'domcontentloaded' });
-
-    const product = await page.evaluate(() => {
-      const getText = (selector) => document.querySelector(selector)?.innerText?.trim() || null;
-      const getAttr = (selector, attr) => document.querySelector(selector)?.getAttribute(attr) || null;
-
-      const title = getText('#productTitle');
-      const priceStr = getText('.a-price .a-offscreen') || getText('#priceblock_dealprice') || getText('#priceblock_ourprice');
-      const originalStr = getText('.priceBlockStrikePriceString') || priceStr;
-
-      const price = parseFloat(priceStr?.replace(/[₹,]/g, ''));
-      const originalPrice = parseFloat(originalStr?.replace(/[₹,]/g, ''));
-
-      const discount = originalPrice && price ? Math.round(((originalPrice - price) / originalPrice) * 100) : 0;
-      const image = getAttr('#landingImage', 'src');
-      const ratingStr = getText('.a-icon-alt');
-      const rating = parseFloat(ratingStr?.split(' ')[0]) || null;
-
-      return {
-        title,
-        price,
-        originalPrice,
-        discount,
-        image,
-        rating
-      };
+    const response = await axios.get(url, {
+      headers: {
+        // Simulate a real browser
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119 Safari/537.36',
+      },
     });
 
-    await browser.close();
+    const $ = cheerio.load(response.data);
 
-    // Check if product with same title already exists
+    const title = $('#productTitle').text().trim();
+    const priceStr =
+      $('.a-price .a-offscreen').first().text().trim() ||
+      $('#priceblock_dealprice').text().trim() ||
+      $('#priceblock_ourprice').text().trim();
+    const originalStr =
+      $('.priceBlockStrikePriceString').text().trim() || priceStr;
+
+    const price = parseFloat(priceStr.replace(/[₹,]/g, ''));
+    const originalPrice = parseFloat(originalStr.replace(/[₹,]/g, ''));
+
+    const discount =
+      originalPrice && price
+        ? Math.round(((originalPrice - price) / originalPrice) * 100)
+        : 0;
+
+    const image = $('#landingImage').attr('src') ||
+                  $('#imgTagWrapperId img').attr('data-old-hires') ||
+                  $('#imgTagWrapperId img').attr('src');
+
+    const ratingStr = $('.a-icon-alt').first().text().trim();
+    const rating = parseFloat(ratingStr.split(' ')[0]) || null;
+
+    const product = {
+      title,
+      price,
+      originalPrice,
+      discount,
+      image,
+      rating,
+    };
+
+    // Check for duplicates
     const existingProduct = await Product.findOne({ title: product.title });
 
     if (existingProduct && existingProduct.price === product.price) {
-      return res.status(200).json({ message: '⚠️ Product already exists with the same price. Skipping save.' });
+      return res
+        .status(200)
+        .json({ message: '⚠️ Product already exists with the same price. Skipping save.' });
     }
 
     const result = {
@@ -64,17 +80,16 @@ router.post('/add-product', async (req, res) => {
       affiliateLink: generateAffiliateLink(url),
       source: 'Amazon',
       category: 'Unknown',
-      addedAt: new Date()
+      addedAt: new Date(),
     };
 
     const savedProduct = await Product.create(result);
 
     console.log('\n✅ Product saved to DB:\n', JSON.stringify(savedProduct, null, 2));
-
     res.status(200).json({ message: '✅ Product scraped and saved', data: savedProduct });
 
   } catch (error) {
-    console.error('❌ Error:', error.message);
+    console.error('❌ Scraping error:', error.message);
     res.status(500).json({ error: 'Failed to scrape and save product' });
   }
 });

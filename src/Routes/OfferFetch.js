@@ -4,12 +4,17 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const headers = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
   'Accept-Language': 'en-IN,en;q=0.9',
   'Accept-Encoding': 'gzip, deflate, br',
-  'Referer': 'https://www.amazon.in/',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+  'Referer': 'https://www.google.com/',
+  'DNT': '1',
   'Connection': 'keep-alive',
+  'Upgrade-Insecure-Requests': '1',
+  'Cache-Control': 'no-cache',
 };
+
 
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -71,7 +76,7 @@ async function fetchAmazonDealsByCategory() {
             console.error(`❌ [${i + 1}] Failed to add product: ${productUrl}`, err.response?.data || err.message);
           }
 
-          await delay(1000); // Wait 1s between product POSTs
+          await delay(1000); 
         }
 
       } catch (err) {
