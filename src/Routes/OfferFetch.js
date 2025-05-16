@@ -48,7 +48,7 @@ async function fetchAmazonDealsByCategory() {
     const productLinksSet = new Set();
     let successfulCount = 0;
     const maxProducts = 10;
-    const maxPages = 5; 
+    const maxPages = 3; 
 
     for (let page = 1; page <= maxPages; page++) {
       if (successfulCount >= maxProducts) break;
