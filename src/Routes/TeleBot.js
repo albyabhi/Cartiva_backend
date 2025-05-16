@@ -9,7 +9,7 @@ const CHAT_ID = process.env.CHAT_ID;
 
 
 async function sendProductToTelegram(product) {
-  const caption = `🔥 *${product.title}*\n` +
+  const caption = `🔥 *${escapeMarkdown(product.title)}*\n` +
                   `💰 Price: ₹${product.price}\n` +
                   (product.discount > 0 ? `🎯 Discount: ${product.discount}% off\n` : '');
 
@@ -34,17 +34,25 @@ async function sendProductToTelegram(product) {
     await Product.findByIdAndUpdate(product._id, { shareStatus: 'shared' });
     console.log('Product sent and status updated:', product.title);
   } catch (error) {
+    const retryAfter = error.response?.data?.parameters?.retry_after;
+    if (retryAfter) {
+      console.warn(`⏳ Rate limit hit. Retrying after ${retryAfter} seconds...`);
+      await new Promise(resolve => setTimeout(resolve, (retryAfter + 1) * 1000));
+      return sendProductToTelegram(product); // Retry after wait
+    }
     console.error('Failed to send product:', error.response?.data || error.message);
   }
 }
 
+
 async function sendProductDetails(products) {
-  // Loop over products sequentially to avoid flooding Telegram
   for (const product of products) {
     console.log('Sending product:', product.title);
     await sendProductToTelegram(product);
+    await new Promise(resolve => setTimeout(resolve, 4000)); // 4 seconds delay
   }
 }
+
 
 async function fetchAllProducts() {
   try {
