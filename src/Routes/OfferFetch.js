@@ -40,15 +40,19 @@ const categories = [
 ];
 
 
-const maxPagesPerCategory = 2; 
 
 async function fetchAmazonDealsByCategory() {
   for (const category of categories) {
     console.log(`\n📂 Scraping category: ${category.name}`);
 
     const productLinksSet = new Set();
+    let successfulCount = 0;
+    const maxProducts = 10;
+    const maxPages = 5; 
 
-    for (let page = 1; page <= maxPagesPerCategory; page++) {
+    for (let page = 1; page <= maxPages; page++) {
+      if (successfulCount >= maxProducts) break;
+
       const pageUrl = `${category.url}&page=${page}`;
       console.log(`📝 Fetching page ${page} for ${category.name}...`);
 
@@ -56,37 +60,45 @@ async function fetchAmazonDealsByCategory() {
         const response = await axios.get(pageUrl, { headers });
         const $ = cheerio.load(response.data);
 
+        // Collect product links from this page
+        const pageProductLinks = [];
         $('a.a-link-normal.s-no-outline').each((_, el) => {
           const href = $(el).attr('href');
           if (href && href.startsWith('/')) {
             const fullUrl = `https://www.amazon.in${href.split('?')[0]}`;
-            productLinksSet.add(fullUrl);
+            if (!productLinksSet.has(fullUrl)) {
+              pageProductLinks.push(fullUrl);
+            }
           }
         });
 
-        const topLinks = Array.from(productLinksSet).slice(0, 10);
-        console.log(`🔗 Found ${topLinks.length} products on page ${page}`);
+        console.log(`🔗 Found ${pageProductLinks.length} new products on page ${page}`);
 
-        for (const [i, productUrl] of topLinks.entries()) {
+        for (const productUrl of pageProductLinks) {
+          if (successfulCount >= maxProducts) break;
+
           try {
-            await axios.post(BACKEND_API, {
-              url: productUrl,
-            });
-            console.log(`✅ [${i + 1}] Added product: ${productUrl}`);
+            await axios.post(BACKEND_API, { url: productUrl });
+            productLinksSet.add(productUrl);
+            successfulCount++;
+            console.log(`✅ [${successfulCount}] Added product: ${productUrl}`);
           } catch (err) {
-            console.error(`❌ [${i + 1}] Failed to add product: ${productUrl}`, err.response?.data || err.message);
+            console.error(`❌ Failed to add product: ${productUrl}`, err.response?.data || err.message);
           }
 
-          await delay(1000); 
+          await delay(4000); // delay between product POST requests
         }
 
       } catch (err) {
         console.error(`❌ Failed to fetch page ${page} of category ${category.name}:`, err.message);
       }
 
-      await delay(4000); 
+      await delay(4000); // delay between page requests
     }
+
+    console.log(`✅ Finished category ${category.name} with ${successfulCount} products added.`);
   }
 }
+
 
 export default fetchAmazonDealsByCategory;
