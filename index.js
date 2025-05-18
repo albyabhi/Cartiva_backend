@@ -5,7 +5,7 @@ import cors from 'cors';
 import connectDB from './src/config/db.js';
 
 import Product from './src/Routes/Product.js';
-import fetchAllProducts from './src/Routes/TeleBot.js';
+import { fetchAllProducts , deleteOldProducts } from './src/Routes/TeleBot.js';
 import fetchAmazonDeals from './src/Routes/OfferFetch.js';
 
 dotenv.config();
@@ -22,12 +22,15 @@ app.use(express.json());
 // Routes
 app.use('/product', Product);
 
-cron.schedule('0 1,6,9,12,15,18,21 * * *', async () => {
-  console.log('\n⏰ Scheduled fetch started...');
+cron.schedule('0 */4 * * *', async () => {
+    console.log('\n⏰ Scheduled fetch started...');
   try {
-    await fetchAmazonDeals();
+    // await fetchAmazonDeals();
     console.log('✅ Fetch complete.');
     await fetchAllProducts();
+    console.log('Deleting old prducts.');
+    await deleteOldProducts();
+    console.log('✅ Delete complete.');
   } catch (error) {
     console.error('❌ Error during scheduled fetch:', error.message);
   }
@@ -38,6 +41,7 @@ cron.schedule('0 1,6,9,12,15,18,21 * * *', async () => {
   try {
     await fetchAmazonDeals();
     await fetchAllProducts();
+    await deleteOldProducts();
   } catch (error) {
     console.error('❌ Error during startup fetch:', error.message);
   }

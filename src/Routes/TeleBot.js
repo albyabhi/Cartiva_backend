@@ -70,4 +70,21 @@ async function fetchAllProducts() {
   }
 }
 
-export default fetchAllProducts;
+
+async function deleteOldProducts(days = 2) {
+  try {
+    const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    
+    const result = await Product.deleteMany({ addedAt: { $lt: cutoffDate } });
+
+    console.log(`🗑️ Deleted ${result.deletedCount} products older than ${days} day(s).`);
+    return result;
+  } catch (error) {
+    console.error('❌ Failed to delete old products:', error.message);
+    throw new Error('Error deleting old products');
+  }
+}
+
+
+
+export { fetchAllProducts, deleteOldProducts };
