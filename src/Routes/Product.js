@@ -35,13 +35,20 @@ router.post("/add-product", async (req, res) => {
     const $ = cheerio.load(response.data);
 
     const title = $("#productTitle").text().trim();
-    const priceStr =
-      $("#priceblock_dealprice").text().trim() ||
-      $("#priceblock_ourprice").text().trim() ||
-      $("#priceblock_saleprice").text().trim() ||
-      $(".a-price .a-offscreen").first().text().trim() ||
-      $("[data-asin-price]").attr("data-asin-price") ||
-      $('[data-a-size="l"]').text().trim(); // fallback
+    let priceStr =
+  $("#priceblock_dealprice").text().trim() ||
+  $("#priceblock_ourprice").text().trim() ||
+  $("#priceblock_saleprice").text().trim() ||
+  $(".a-price .a-offscreen").first().text().trim() ||
+  (() => {
+    const whole = $(".a-price-whole").first().text().trim().replace(/[,]/g, "");
+    const fraction = $(".a-price-fraction").first().text().trim() || "00";
+    return whole ? `${whole}.${fraction}` : null;
+  })() ||
+  $("[data-asin-price]").attr("data-asin-price") ||
+  $('[data-a-size="l"]').text().trim();
+
+
 
     const originalStr =
       $(".priceBlockStrikePriceString").text().trim() || priceStr;
