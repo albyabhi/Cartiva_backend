@@ -41,12 +41,24 @@ router.post("/add-product", async (req, res) => {
   $("#priceblock_saleprice").text().trim() ||
   $(".a-price .a-offscreen").first().text().trim() ||
   (() => {
+    // Try to get price from split whole + fraction elements
     const whole = $(".a-price-whole").first().text().trim().replace(/[,]/g, "");
     const fraction = $(".a-price-fraction").first().text().trim() || "00";
     return whole ? `${whole}.${fraction}` : null;
   })() ||
+  // New explicit handling for the aria-hidden price span case
+  (() => {
+    const symbol = $(".a-price-symbol").first().text().trim(); // usually ₹
+    const whole = $(".a-price-whole").first().text().trim().replace(/[,]/g, "");
+    if (whole) {
+      // Combine symbol + whole, ignoring fraction here since missing in your example
+      return whole; // Just return the numeric part, currency handled separately if needed
+    }
+    return null;
+  })() ||
   $("[data-asin-price]").attr("data-asin-price") ||
   $('[data-a-size="l"]').text().trim();
+
 
 
 
