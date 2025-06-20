@@ -8,6 +8,8 @@ import Product from "./src/Routes/Product.js";
 import { fetchAllProducts, deleteOldProducts } from "./src/Routes/TeleBot.js";
 import fetchAmazonDeals from "./src/Routes/OfferFetch.js";
 
+import TriggerRoutes from "./src/Routes/TriggerRoute.js"
+
 dotenv.config();
 connectDB();
 
@@ -20,6 +22,7 @@ app.use(express.json());
 
 // Routes
 app.use("/product", Product);
+app.use("/",TriggerRoutes)
 
 let nextFetchTime = null;
 const FOUR_HOURS = 4 * 60 * 60 * 1000;
