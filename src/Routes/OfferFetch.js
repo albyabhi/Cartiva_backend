@@ -38,93 +38,33 @@ const MAX_RETRIES = 3;
 const RETRY_DELAY = 5000;
 
 const categories = [
-  {
-    name: "Electronics",
-    url: "https://www.amazon.in/s?i=electronics&rh=p_36%3A-500000",
-  },
-  {
-    name: "Mobile Phones",
-    url: "https://www.amazon.in/s?i=mobile&rh=p_36%3A-20000",
-  },
-  { name: "Books", url: "https://www.amazon.in/s?i=stripbooks&rh=p_36%3A-500" },
-  {
-    name: "Home & Kitchen",
-    url: "https://www.amazon.in/s?i=garden&rh=p_36%3A-5000",
-  },
-  { name: "Fashion", url: "https://www.amazon.in/s?i=fashion&rh=p_36%3A-2000" },
-  { name: "Beauty", url: "https://www.amazon.in/s?i=beauty&rh=p_36%3A-1000" },
-  {
-    name: "Toys",
-    url: "https://www.amazon.in/s?i=toys-and-games&rh=p_36%3A-1000",
-  },
-  { name: "Sports", url: "https://www.amazon.in/s?i=sports&rh=p_36%3A-3000" },
-  {
-    name: "Computers",
-    url: "https://www.amazon.in/s?i=computers&rh=p_36%3A-50000",
-  },
-  { name: "Baby", url: "https://www.amazon.in/s?i=baby&rh=p_36%3A-2000" },
-  { name: "Grocery", url: "https://www.amazon.in/s?i=grocery&rh=p_36%3A-500" },
-  {
-    name: "Gaming Laptops",
-    url: "https://www.amazon.in/s?i=computers&rh=p_36%3A-150000,n%3A1375424031",
-  },
-  {
-    name: "PC Components",
-    url: "https://www.amazon.in/s?i=computers&rh=p_36%3A-50000,n%3A1375344031",
-  },
-  {
-    name: "Gaming Consoles",
-    url: "https://www.amazon.in/s?i=videogames&rh=p_36%3A-50000,n%3A1984443031",
-  },
-  {
-    name: "Headphones & Earphones",
-    url: "https://www.amazon.in/s?i=electronics&rh=p_36%3A-20000,n%3A1389432031",
-  },
-  {
-    name: "PC Accessories",
-    url: "https://www.amazon.in/s?i=computers&rh=p_36%3A-10000,n%3A1375345031",
-  },
-  {
-    name: "Mobile Accessories",
-    url: "https://www.amazon.in/s?i=mobile&rh=p_36%3A-5000,n%3A1805560031",
-  },
-  {
-    name: "Cameras",
-    url: "https://www.amazon.in/s?i=electronics&rh=p_36%3A-100000,n%3A1389396031",
-  },
-  {
-    name: "Smart Watches",
-    url: "https://www.amazon.in/s?i=electronics&rh=p_36%3A-30000,n%3A1571271031",
-  },
-  {
-    name: "Televisions",
-    url: "https://www.amazon.in/s?i=electronics&rh=p_36%3A-150000,n%3A1389396031%2Cp_n_size_browse-bin%3A1464446031",
-  },
-  {
-    name: "External Storage",
-    url: "https://www.amazon.in/s?i=computers&rh=p_36%3A-15000,n%3A1375342031",
-  },
-  {
-    name: "Gaming Accessories",
-    url: "https://www.amazon.in/s?i=videogames&rh=p_36%3A-10000,n%3A40910948031",
-  },
-  {
-    name: "Bluetooth Speakers",
-    url: "https://www.amazon.in/s?i=electronics&rh=p_36%3A-15000,n%3A1389401031",
-  },
-  {
-    name: "Smart Home Devices",
-    url: "https://www.amazon.in/s?i=electronics&rh=p_36%3A-25000,n%3A14644992031",
-  },
-  {
-    name: "Kitchen Appliances",
-    url: "https://www.amazon.in/s?i=kitchen&rh=p_36%3A-15000,n%3A1380365031",
-  },
-  {
-    name: "Office Furniture",
-    url: "https://www.amazon.in/s?i=office&rh=p_36%3A-30000,n%3A3591666031",
-  },
+  { name: "Electronics", url: "https://www.amazon.in/s?node=976419031&rh=p_n_deal_type:26921224031" },
+  { name: "Mobile Phones", url: "https://www.amazon.in/s?node=1389401031&rh=p_n_deal_type:26921224031" },
+  { name: "Books", url: "https://www.amazon.in/s?node=976389031&rh=p_n_deal_type:26921224031" },
+  { name: "Home & Kitchen", url: "https://www.amazon.in/s?node=976442031&rh=p_n_deal_type:26921224031" },
+  { name: "Fashion", url: "https://www.amazon.in/s?node=1968024031&rh=p_n_deal_type:26921224031" },
+  { name: "Beauty", url: "https://www.amazon.in/s?node=1355016031&rh=p_n_deal_type:26921224031" },
+  { name: "Toys", url: "https://www.amazon.in/s?node=1350380031&rh=p_n_deal_type:26921224031" },
+  { name: "Sports", url: "https://www.amazon.in/s?node=1984443031&rh=p_n_deal_type:26921224031" },
+  { name: "Computers", url: "https://www.amazon.in/s?node=976392031&rh=p_n_deal_type:26921224031" },
+  { name: "Baby", url: "https://www.amazon.in/s?node=1571274031&rh=p_n_deal_type:26921224031" },
+  { name: "Grocery", url: "https://www.amazon.in/s?node=2454178031&rh=p_n_deal_type:26921224031" },
+  { name: "Gaming Laptops", url: "https://www.amazon.in/s?node=1375424031&rh=p_n_deal_type:26921224031" },
+  { name: "Gaming Consoles", url: "https://www.amazon.in/s?node=40910948031&rh=p_n_deal_type:26921224031" },
+  { name: "Headphones & Earphones", url: "https://www.amazon.in/s?node=1389432031&rh=p_n_deal_type:26921224031" },
+  { name: "PC Accessories", url: "https://www.amazon.in/s?node=1375345031&rh=p_n_deal_type:26921224031" },
+  { name: "Mobile Accessories", url: "https://www.amazon.in/s?node=1805560031&rh=p_n_deal_type:26921224031" },
+  { name: "Cameras", url: "https://www.amazon.in/s?node=1389396031&rh=p_n_deal_type:26921224031" },
+  { name: "Smart Watches", url: "https://www.amazon.in/s?node=1571271031&rh=p_n_deal_type:26921224031" },
+  { name: "Televisions", url: "https://www.amazon.in/s?node=1389396031&rh=p_n_deal_type:26921224031" },
+  { name: "External Storage", url: "https://www.amazon.in/s?node=1375342031&rh=p_n_deal_type:26921224031" },
+  { name: "Gaming Accessories", url: "https://www.amazon.in/s?node=40910948031&rh=p_n_deal_type:26921224031" },
+  { name: "Bluetooth Speakers", url: "https://www.amazon.in/s?node=1389401031&rh=p_n_deal_type:26921224031" },
+  { name: "Smart Home Devices", url: "https://www.amazon.in/s?node=14644992031&rh=p_n_deal_type:26921224031" },
+  { name: "Kitchen Appliances", url: "https://www.amazon.in/s?node=1380365031&rh=p_n_deal_type:26921224031" },
+  { name: "Office Furniture", url: "https://www.amazon.in/s?node=3591666031&rh=p_n_deal_type:26921224031" },
 ];
+
 
 const maxPagesPerCategory = 3;
 const globalProcessedProducts = new Set();
