@@ -7,8 +7,7 @@ import TelegramBot from "node-telegram-bot-api";
 
 dotenv.config();
 
-const BACKEND_API = `${process.env.BACKEND_URL}/product/add-product`;
-const SERVER_URL = process.env.SERVER_URL; // ✅ added this
+const SERVER_URL = process.env.BACKEND_URL; // ✅ added this
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const CHAT_ID = process.env.CHAT_ID;
 
@@ -88,30 +87,12 @@ async function deleteOldProducts(days = 2) {
 
 bot.onText(/\/fetch/, async (msg) => {
   const chatId = msg.chat.id;
+
   try {
-    // Step 1: Notify fetch start
-    await bot.sendMessage(chatId, '🚀 Fetching started...');
-
-    // Step 2: Call backend API and stream progress
-    let progressMessages = [
-      '📦 Step 1/3: Fetching Amazon Deals...',
-      '📡 Step 2/3: Sharing to Telegram...',
-      '🧹 Step 3/3: Cleaning old products...'
-    ];
-
-    for (let i = 0; i < progressMessages.length; i++) {
-      await bot.sendMessage(chatId, `${progressMessages[i]}\nProgress: ${Math.floor((i / 3) * 100)}%`);
-      if (i === 0) await fetchAmazonDeals();
-      if (i === 1) await fetchAllProducts();
-      if (i === 2) await deleteOldProducts();
-      await new Promise((res) => setTimeout(res, 1000)); // Just for visible delay
-    }
-
-    await bot.sendMessage(chatId, '✅ Fetch Completed! Progress: 100%');
-
+    await axios.get(`${SERVER_URL}/trigger-fetch?chatId=${chatId}`);
   } catch (error) {
     console.error("❌ Error calling fetch route:", error.message);
-    await bot.sendMessage(chatId, `❌ Fetch Failed: ${error.message}`);
+    bot.sendMessage(chatId, `❌ Failed to fetch: ${error.message}`);
   }
 });
 
