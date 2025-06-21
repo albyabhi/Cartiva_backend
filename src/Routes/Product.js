@@ -33,17 +33,30 @@ function generateAffiliateLink(originalUrl) {
 
 // Centralized headers configuration
 const AMAZON_HEADERS = {
-  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119 Safari/537.36",
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
   "Accept-Language": "en-US,en;q=0.9",
-  "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
-  "Referer": "https://www.amazon.com/",
-  "Connection": "keep-alive"
+  "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+  "Referer": "https://www.google.com/",
+  "Connection": "keep-alive",
+  "Cache-Control": "no-cache",
+  "Pragma": "no-cache"
 };
+
+function parsePrice(priceStr) {
+  if (!priceStr) return NaN;
+  
+  const cleaned = priceStr
+    .replace(/[^\d.,]/g, '')
+    .replace(/,(\d{3})/g, '$1') // Handle thousands separators
+    .replace(',', '.'); // Handle European decimal commas
+  
+  return parseFloat(cleaned);
+}
 
 router.post("/add-product", async (req, res) => {
   const { url } = req.body;
 
-  if (!url || !/https?:\/\/(www\.)?amazon\.[a-z]{2,3}(\.[a-z]{2})?/.test(url)) {
+  if (!url || !/https?:\/\/(www\.)?amazon\.[a-z.]+\//i.test(url)) {
     return res.status(400).json({ error: "❌ Invalid or non-Amazon URL" });
   }
 
@@ -61,97 +74,227 @@ router.post("/add-product", async (req, res) => {
 
     const $ = cheerio.load(response.data);
 
-    // Extract critical data first
-    const title = $("#productTitle").text().trim() || 
-                  $("meta[name='title']").attr("content") || 
-                  "";
+    // --------- TITLE EXTRACTION ---------
+    let title = "";
+    const titleSelectors = [
+      "#productTitle",
+      "#title",
+      "h1#title",
+      "span#productTitle",
+      "meta[property='og:title']",
+      "meta[name='title']",
+      "title"
+    ];
 
-    // Handle unavailable products
-    if ($("#outOfStock").length || 
-        /currently unavailable/i.test($("#availability").text())) {
-      return res.status(404).json({ error: "❌ Product is unavailable" });
+    for (const selector of titleSelectors) {
+      const element = $(selector).first();
+      if (element.length) {
+        title = element.text().trim() || element.attr("content") || "";
+        if (title) {
+          // Clean up title from Amazon additions
+          title = title.replace(/(Amazon\.(com|co\.uk|ca|de|fr|it|es|jp|in)| : |\s+-\s+Amazon\.).*/gi, "").trim();
+          break;
+        }
+      }
+    }
+
+    // Fallback to JSON-LD for title
+    if (!title) {
+      const jsonLd = $('script[type="application/ld+json"]').html();
+      if (jsonLd) {
+        try {
+          const parsedData = JSON.parse(jsonLd.replace(/\\/g, ''));
+          const productData = Array.isArray(parsedData) ? 
+            parsedData.find(item => item["@type"] === "Product") : 
+            parsedData;
+          
+          if (productData && productData.name) {
+            title = productData.name.trim();
+          }
+        } catch (e) {
+          console.log("JSON-LD parse error:", e.message);
+        }
+      }
+    }
+
+    if (!title) {
+      return res.status(400).json({ error: "❌ Could not extract product title" });
     }
 
     // --------- PRICE EXTRACTION ---------
-    const extractPrice = selector => {
-      const text = $(selector).first().text().trim().replace(/[^0-9.,]/g, "");
-      return parseFloat(text.replace(/[.,]/g, m => m === ',' ? '' : '.'));
-    };
+    let price = null;
+    let originalPrice = null;
 
-    // Priority order for price extraction
-    const priceSelectors = [
-      'span.a-price[data-a-size="xl"] span',  // Main price
+    // Priority 1: Price block selectors
+    const priceBlockSelectors = [
+      'span.a-price[data-a-size="xl"] span.a-offscreen',
       '#priceblock_ourprice',
       '#priceblock_dealprice',
       '#priceblock_saleprice',
       '.a-price .a-offscreen',
-      '[data-a-color="price"] span'
+      '.priceToPay span.a-offscreen',
+      'span.aok-offscreen'
     ];
 
-    let price = null;
-    for (const selector of priceSelectors) {
-      price = extractPrice(selector);
-      if (!isNaN(price)) break;
-    }
-
-    // Fallback to JSON-LD data
-    if (isNaN(price)) {
-      const jsonData = $('script[type="application/ld+json"]').html();
-      if (jsonData) {
-        try {
-          const productData = JSON.parse(jsonData.replace(/\\/g, ''));
-          if (Array.isArray(productData)) {
-            const mainProduct = productData.find(item => item["@type"] === "Product");
-            if (mainProduct?.offers?.price) {
-              price = parseFloat(mainProduct.offers.price);
-            }
-          } else if (productData.offers?.price) {
-            price = parseFloat(productData.offers.price);
-          }
-        } catch (e) { /* Ignore parse errors */ }
+    for (const selector of priceBlockSelectors) {
+      const priceElement = $(selector).first();
+      if (priceElement.length) {
+        const priceText = priceElement.text().trim();
+        price = parsePrice(priceText);
+        if (!isNaN(price)) break;
       }
     }
 
-    // --------- ADDITIONAL DATA EXTRACTION ---------
-    // Original price
-    const originalPrice = extractPrice(".a-price.a-text-price span") || 
-                          extractPrice(".basisPrice .a-text-price span");
+    // Priority 2: JSON-LD data
+    if (isNaN(price)) {
+      try {
+        const jsonLd = $('script[type="application/ld+json"]').html();
+        if (jsonLd) {
+          const parsedData = JSON.parse(jsonLd.replace(/\\/g, ''));
+          const productData = Array.isArray(parsedData) ? 
+            parsedData.find(item => item["@type"] === "Product") : 
+            parsedData;
+          
+          if (productData) {
+            // Handle different offer structures
+            const offers = productData.offers;
+            if (offers) {
+              if (Array.isArray(offers)) {
+                price = parsePrice(offers[0]?.price);
+              } else if (typeof offers === 'object') {
+                price = parsePrice(offers.price);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.log("JSON-LD price parse error:", e.message);
+      }
+    }
 
-    // Discount calculation
-    const discount = originalPrice && !isNaN(originalPrice) && originalPrice > price
-      ? Math.round(((originalPrice - price) / originalPrice) * 100)
-      : 0;
+    // Priority 3: Data attributes
+    if (isNaN(price)) {
+      const priceData = $('#corePriceDisplay_desktop_feature_div').data();
+      if (priceData && priceData.priceAmount) {
+        price = parseFloat(priceData.priceAmount);
+      }
+    }
 
-    // Image extraction with fallbacks
-    const image = $("#landingImage").attr("data-old-hires") ||
-                  $("#landingImage").attr("src") ||
-                  $("#imgTagWrapperId img").attr("data-old-hires") ||
-                  $("#imgTagWrapperId img").attr("src") ||
-                  $("div#imageBlock img").attr("src");
+    if (isNaN(price)) {
+      return res.status(400).json({ error: "❌ Could not extract product price" });
+    }
 
-    // Rating and review count
+    // --------- ORIGINAL PRICE EXTRACTION ---------
+    const originalPriceSelectors = [
+      '.basisPrice .a-text-price span',
+      '.a-price.a-text-price span.a-offscreen',
+      '#listPrice',
+      '#priceblock_saleprice_row',
+      '.a-text-price[data-a-strike="true"]',
+      '.a-price.a-text-price .a-offscreen'
+    ];
+
+    for (const selector of originalPriceSelectors) {
+      const originalPriceElement = $(selector).first();
+      if (originalPriceElement.length) {
+        const originalPriceText = originalPriceElement.text().trim();
+        originalPrice = parsePrice(originalPriceText);
+        if (!isNaN(originalPrice)) break;
+      }
+    }
+
+    // Calculate discount if we have both prices
+    let discount = 0;
+    if (!isNaN(originalPrice) && originalPrice > price) {
+      discount = Math.round(((originalPrice - price) / originalPrice) * 100);
+    }
+
+    // --------- IMAGE EXTRACTION ---------
+    const imageSelectors = [
+      '#landingImage',
+      '#imgTagWrapperId img',
+      '#main-image-container img',
+      '#imageBlock img',
+      'div.image-wrapper img',
+      'img[data-old-hires]',
+      'img[data-a-image-name="landingImage"]'
+    ];
+
+    let image = "";
+    for (const selector of imageSelectors) {
+      const imgElement = $(selector).first();
+      if (imgElement.length) {
+        image = imgElement.attr('data-old-hires') || 
+                imgElement.attr('src') || 
+                imgElement.attr('data-src') ||
+                "";
+        if (image) break;
+      }
+    }
+
+    // Fallback to meta image
+    if (!image) {
+      image = $('meta[property="og:image"]').attr('content') || "";
+    }
+
+    // --------- RATING EXTRACTION ---------
+    let rating = null;
+    let reviewCount = 0;
+
     const ratingElement = $("i.a-icon-star span.a-icon-alt").first();
     const ratingText = ratingElement.text().trim();
-    const rating = parseFloat(ratingText.split(" ")[0]) || null;
-    const reviewCount = parseInt($("#acrCustomerReviewText").text().replace(/\D/g, "")) || 0;
+    if (ratingText) {
+      rating = parseFloat(ratingText.split(" ")[0]);
+    }
 
-    // Category from breadcrumbs
-    const category = $("#wayfinding-breadcrumbs_container ul li:last-child span a")
-                      .text().trim() || "Unknown";
+    const reviewCountText = $("#acrCustomerReviewText").text().trim();
+    if (reviewCountText) {
+      reviewCount = parseInt(reviewCountText.replace(/\D/g, "")) || 0;
+    }
 
-    // Key features/bullet points
+    // --------- CATEGORY EXTRACTION ---------
+    let category = "Unknown";
+    const categorySelectors = [
+      '#wayfinding-breadcrumbs_container ul li:last-child span a',
+      '#nav-subnav .nav-a-content',
+      '#nav-breadcrumb a',
+      '.a-breadcrumb li:last-child a'
+    ];
+
+    for (const selector of categorySelectors) {
+      const categoryElement = $(selector).first();
+      if (categoryElement.length) {
+        category = categoryElement.text().trim();
+        if (category) break;
+      }
+    }
+
+    // --------- FEATURES EXTRACTION ---------
     const features = [];
     $("#feature-bullets li:not(.aok-hidden)").each((i, el) => {
       const text = $(el).text().trim();
       if (text) features.push(text);
     });
 
-    // Product description
-    const description = $("#productDescription").text().trim() ||
-                        $("#feature-bullets").text().trim().substring(0, 500) ||
-                        "";
+    // Fallback to technical details
+    if (features.length === 0) {
+      $("#prodDetails .a-spacing-small").each((i, el) => {
+        const text = $(el).text().trim();
+        if (text) features.push(text);
+      });
+    }
 
-    // ASIN extraction
+    // --------- DESCRIPTION EXTRACTION ---------
+    let description = $("#productDescription").text().trim() ||
+                     $("#feature-bullets").text().trim().substring(0, 500) ||
+                     "";
+
+    // Fallback to meta description
+    if (!description) {
+      description = $('meta[name="description"]').attr('content') || "";
+    }
+
+    // --------- ASIN EXTRACTION ---------
     const asin = $("#ASIN").val() || 
                  new URL(url).pathname.split("/dp/")[1]?.split("/")[0] || 
                  "";
@@ -160,7 +303,7 @@ router.post("/add-product", async (req, res) => {
     const product = {
       title,
       price,
-      originalPrice: originalPrice > price ? originalPrice : null,
+      originalPrice: !isNaN(originalPrice) && originalPrice > price ? originalPrice : null,
       discount,
       image,
       rating,
@@ -186,7 +329,14 @@ router.post("/add-product", async (req, res) => {
       const updatedProduct = priceChanged 
         ? await Product.findByIdAndUpdate(
             existingProduct._id,
-            { $set: { price, originalPrice, discount }, $push: { priceHistory: existingProduct.price } },
+            { 
+              $set: { 
+                price, 
+                originalPrice: !isNaN(originalPrice) ? originalPrice : null, 
+                discount 
+              }, 
+              $push: { priceHistory: existingProduct.price } 
+            },
             { new: true }
           )
         : existingProduct;
