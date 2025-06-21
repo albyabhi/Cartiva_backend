@@ -1,6 +1,6 @@
 import express from "express";
-import fetchAmazonDeals from "./src/Routes/OfferFetch.js";
-import { fetchAllProducts, deleteOldProducts } from "./src/Routes/TeleBot.js";
+import fetchAmazonDealsByCategory from "./OfferFetch.js";
+import { fetchAllProducts, deleteOldProducts } from "./TeleBot.js";
 
 const router = express.Router();
 
@@ -9,7 +9,7 @@ router.get('/trigger-fetch', async (req, res) => {
     console.log(`\n🚀 Fetch started at ${new Date().toLocaleString()}`);
     
     // Run all tasks sequentially
-    await fetchAmazonDeals();
+    await fetchAmazonDealsByCategory();
     await fetchAllProducts();
     await deleteOldProducts();
     
