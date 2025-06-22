@@ -4,38 +4,28 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// Random User-Agent headers
 const getRandomUserAgent = () => {
-  const userAgents = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/115.0",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36 Edg/117.0.2045.60",
+  const agents = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64)...", // trim for brevity
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)...",
+    "Mozilla/5.0 (X11; Linux x86_64)...",
   ];
-  return userAgents[Math.floor(Math.random() * userAgents.length)];
+  return agents[Math.floor(Math.random() * agents.length)];
 };
 
 const getHeaders = () => ({
   "User-Agent": getRandomUserAgent(),
   "Accept-Language": "en-IN,en;q=0.9",
-  "Accept-Encoding": "gzip, deflate, br",
-  Referer: "https://www.amazon.in/",
-  Connection: "keep-alive",
-  "Upgrade-Insecure-Requests": "1",
-  "Sec-Fetch-Dest": "document",
-  "Sec-Fetch-Mode": "navigate",
-  "Sec-Fetch-Site": "same-origin",
-  "Sec-Fetch-User": "?1",
+  "Referer": "https://www.amazon.in/",
 });
-
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 const BACKEND_API = `${process.env.BACKEND_URL}/product/add-product`;
 const MAX_RETRIES = 3;
-const RETRY_DELAY = 5000;
+const PAGE_LIMIT = 3;
+const globalProcessedASINs = new Set();
+
+const delay = (ms) => new Promise((res) => setTimeout(res, ms));
+
 
 const categories = [
   { name: "Electronics", url: "https://www.amazon.in/s?rh=n:976419031,p_n_deal_type:26921224031" },
@@ -67,196 +57,90 @@ const categories = [
 
 
 
-const maxPagesPerCategory = 3;
-const globalProcessedProducts = new Set();
+const isSupportedProduct = (url) => ![
+  /\/ebook\//i, /-Kindle/i, /\/digital\//i, /\/video\//i, /\/music\//i,
+  /\/app\//i, /\/subscription\//i, /\/streaming\//i
+].some((pattern) => pattern.test(url));
 
-const isSupportedProduct = (url) => {
-  const unsupportedPatterns = [
-    /\/ebook\//i,
-    /\/dp\/B0[\w]+-Kindle/i,
-    /\/digital\//i,
-    /\/software\//i,
-    /\/mp3\//i,
-    /\/video\//i,
-    /\/prime-video\//i,
-    /\/music\//i,
-    /\/app\//i,
-    /\/subscription\//i,
-    /\/streaming\//i,
-    /\/dgtl\//i,
-  ];
-  return !unsupportedPatterns.some((pattern) => pattern.test(url));
+const extractASIN = (url) => {
+  const match = url.match(/(?:[/dp/]|$)([A-Z0-9]{10})/);
+  return match?.[1] || null;
 };
 
-// Retry request handler (no proxy)
-async function fetchWithRetry(url, options = {}, retries = MAX_RETRIES) {
-  for (let i = 0; i < retries; i++) {
+const retryRequest = async (fn, maxTries = MAX_RETRIES) => {
+  for (let i = 0; i < maxTries; i++) {
     try {
-      const config = {
-        ...options,
-        headers: { ...getHeaders(), ...(options.headers || {}) },
-        timeout: 15000,
-      };
-      const response = await axios.get(url, config);
-      return response;
-    } catch (error) {
-      if (i === retries - 1) throw error;
-      console.log(`Retry ${i + 1}/${retries} for ${url}`);
-      await delay(RETRY_DELAY * (i + 1));
+      return await fn();
+    } catch (err) {
+      if (i === maxTries - 1) throw err;
+      await delay(1000 * (i + 1));
     }
   }
-}
-
-const extractAsin = (url) => {
-  const asinRegex = /(?:[/dp/]|$)([A-Z0-9]{10})/;
-  const match = url.match(asinRegex);
-  return match ? match[1] : null;
 };
 
-async function sendToBackend(url) {
-  for (let i = 0; i < MAX_RETRIES; i++) {
-    try {
-      const response = await axios.post(BACKEND_API, { url });
-
-      // Check for success status and data
-      if (response.status === 201 && response.data?.data) {
-        console.log(`✅ Product saved: ${response.data.data.title}`);
-        return true;
-      }
-
-      // Product already exists or updated
-      if (response.status === 200 && response.data?.data) {
-        console.log(
-          `ℹ️ Product exists or updated: ${response.data.data.title}`
-        );
-        return true;
-      }
-
-      // Unexpected status
-      console.warn(
-        `⚠️ Unexpected response from server for ${url}:`,
-        response.status,
-        response.data
-      );
-      return false;
-    } catch (error) {
-      if (i === MAX_RETRIES - 1) {
-        console.error(
-          `❌ Final failure for ${url}:`,
-          error.response?.data || error.message
-        );
-        return false;
-      }
-      console.log(`🔁 Retry ${i + 1} for ${url}`);
-      await delay(3000 * (i + 1));
-    }
-  }
-}
-
-const getProductType = ($, element) => {
-  const badgeText = $(element)
-    .find(".s-title-instructions-style + div span:first-child")
-    .text()
-    .trim();
-  const title = $(element).find("h2").text().trim().toLowerCase();
-  if (badgeText) return badgeText;
-  if (title.includes("kindle")) return "Kindle eBook";
-  if (title.includes("subscription")) return "Subscription";
-  if (title.includes("digital")) return "Digital Product";
-  if (title.includes("prime video")) return "Video";
-  return "Physical Product";
-};
-
-async function fetchAmazonDealsByCategory() {
-  console.log("🚀 Starting scraping without proxy...");
-
-  for (const [index, category] of categories.entries()) {
-    console.log(
-      `\n📂 [${index + 1}/${categories.length}] Scraping category: ${
-        category.name
-      }`
+const sendProductToBackend = async (url) => {
+  try {
+    const res = await retryRequest(() =>
+      axios.post(BACKEND_API, { url }, { timeout: 10000 })
     );
+    const title = res.data?.data?.title || "Unknown";
+    const status = res.status === 201 ? "✅ Saved" : "ℹ️ Exists";
+    console.log(`${status}: ${title}`);
+  } catch (err) {
+    console.warn(`❌ Failed: ${url}`, err.response?.data || err.message);
+  }
+};
 
-    let hasNextPage = true;
-    let page = 1;
+const parseProductsFromHTML = ($) => {
+  const productUrls = [];
+  $("div[data-component-type='s-search-result']").each((_, el) => {
+    const href = $(el).find("a.a-link-normal.s-no-outline").attr("href");
+    if (href?.startsWith("/")) {
+      const url = `https://www.amazon.in${href.split("?")[0]}`;
+      if (isSupportedProduct(url)) productUrls.push(url);
+    }
+  });
+  return productUrls;
+};
 
-    while (hasNextPage && page <= maxPagesPerCategory) {
-      console.log(`📝 Page ${page} for ${category.name}...`);
-      const pageUrl = `${category.url}&page=${page}`;
+const scrapeCategoryPage = async (url, categoryName, pageNum) => {
+  console.log(`📝 Scraping ${categoryName} - Page ${pageNum}`);
+  const res = await retryRequest(() =>
+    axios.get(`${url}&page=${pageNum}`, { headers: getHeaders() })
+  );
+  const $ = cheerio.load(res.data);
+  const urls = parseProductsFromHTML($);
+  const newUrls = urls
+    .map((url) => ({ url, asin: extractASIN(url) }))
+    .filter(({ asin }) => asin && !globalProcessedASINs.has(asin));
 
+  for (const { asin } of newUrls) globalProcessedASINs.add(asin);
+  return newUrls.map(({ url }) => url);
+};
+
+const fetchAmazonDealsByCategory = async () => {
+  console.log("🚀 Scraper started...");
+
+  for (const { name, url } of categories) {
+    console.log(`📂 Category: ${name}`);
+    for (let page = 1; page <= PAGE_LIMIT; page++) {
       try {
-        const response = await fetchWithRetry(pageUrl);
-        const $ = cheerio.load(response.data);
+        const productUrls = await scrapeCategoryPage(url, name, page);
+        const tasks = productUrls.slice(0, 10).map((url) =>
+          sendProductToBackend(url).then(() => delay(1000))
+        );
+        await Promise.allSettled(tasks);
 
-        const productLinks = new Set();
-        $("div[data-component-type='s-search-result']").each((_, element) => {
-          const linkElement = $(element).find("a.a-link-normal.s-no-outline");
-          const href = linkElement.attr("href");
-
-          if (href && href.startsWith("/")) {
-            const fullUrl = `https://www.amazon.in${href.split("?")[0]}`;
-            if (!isSupportedProduct(fullUrl)) {
-              const productType = getProductType($, element);
-              console.log(`⏩ Skipping ${productType}: ${fullUrl}`);
-              return;
-            }
-            productLinks.add(fullUrl);
-          }
-        });
-
-        let newProducts = 0;
-        for (const productUrl of Array.from(productLinks)) {
-          if (newProducts >= 10) break;
-
-          const asin = extractAsin(productUrl);
-          if (!asin || globalProcessedProducts.has(asin)) continue;
-
-          globalProcessedProducts.add(asin);
-
-          try {
-            const response = await axios.post(BACKEND_API, { url: productUrl });
-
-            if (response.status === 201 && response.data?.data) {
-              console.log(`✅ Product saved: ${response.data.data.title}`);
-              newProducts++;
-            } else if (response.status === 200 && response.data?.data) {
-              console.log(
-                `ℹ️ Product exists or updated: ${response.data.data.title}`
-              );
-            } else {
-              console.warn(
-                `⚠️ Unexpected response from server for ${productUrl}:`,
-                response.status,
-                response.data
-              );
-            }
-          } catch (error) {
-            console.error(
-              `❌ Failed to add product: ${productUrl}`,
-              error.response?.data || error.message
-            );
-          }
-
-          await delay(1500);
-        }
-
-        console.log(`✨ Added ${newProducts} new products from page ${page}`);
-
-        hasNextPage =
-          $(".s-pagination-next").length > 0 &&
-          !$(".s-pagination-next").hasClass("s-pagination-disabled");
-        page++;
+        await delay(3000);
       } catch (err) {
-        console.error(`🚨 Failed to process page ${page}:`, err.message);
+        console.warn(`❌ Skipped ${name} page ${page}:`, err.message);
         break;
       }
-
-      await delay(6000);
     }
   }
 
-  console.log("\n🎉 All categories scraped successfully!");
-  console.log(`📊 Total unique products: ${globalProcessedProducts.size}`);
-}
+  console.log("🎉 Scraping completed.");
+  console.log(`📊 Total unique products sent: ${globalProcessedASINs.size}`);
+};
 
 export default fetchAmazonDealsByCategory;
