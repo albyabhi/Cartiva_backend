@@ -1,8 +1,13 @@
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-core'; 
+import chromium from '@sparticuz/chromium';
 import dotenv from 'dotenv';
 import axios from 'axios';
 
 dotenv.config();
+
+// Configure Chromium
+chromium.setHeadlessMode = true;
+chromium.setGraphicsMode = false;
 
 const getRandomUserAgent = () => {
   const agents = [
@@ -20,6 +25,15 @@ const PAGE_LIMIT = 3;
 const globalProcessedASINs = new Set();
 
 const delay = (ms) => new Promise((res) => setTimeout(res, ms));
+
+const launchBrowser = async () => {
+  return puppeteer.launch({
+    args: chromium.args,
+    executablePath: process.env.CHROMIUM_PATH || await chromium.executablePath(),
+    headless: chromium.headless,
+    ignoreHTTPSErrors: true,
+  });
+};
 
 const categories = [
   { name: "Electronics", url: "https://www.amazon.in/s?rh=n:976419031,p_n_deal_type:26921224031" },
@@ -64,20 +78,7 @@ const sendProductToBackend = async (url) => {
   }
 };
 
-const launchBrowser = async () => {
-  return puppeteer.launch({
-    headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-accelerated-2d-canvas',
-      '--disable-gpu',
-      '--single-process'
-    ],
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-  });
-};
+
 
 const scrapeCategoryPage = async (url, categoryName, pageNum, browser) => {
   console.log(`📝 Scraping ${categoryName} - Page ${pageNum}`);
@@ -128,7 +129,7 @@ const scrapeCategoryPage = async (url, categoryName, pageNum, browser) => {
 };
 
 const fetchAmazonDealsByCategory = async () => {
-  console.log("🚀 Scraper started...");
+ console.log("🚀 Scraper started with Chromium configuration...");
   const browser = await launchBrowser();
 
   try {
