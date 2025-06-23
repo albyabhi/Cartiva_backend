@@ -1,24 +1,19 @@
-import axios from "axios";
-import * as cheerio from "cheerio";
-import dotenv from "dotenv";
+import puppeteer from 'puppeteer';
+import dotenv from 'dotenv';
+import axios from 'axios';
 
 dotenv.config();
 
 const getRandomUserAgent = () => {
   const agents = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64)...", // trim for brevity
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)...",
-    "Mozilla/5.0 (X11; Linux x86_64)...",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Safari/605.1.15",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36"
   ];
   return agents[Math.floor(Math.random() * agents.length)];
 };
 
-const getHeaders = () => ({
-  "User-Agent": getRandomUserAgent(),
-  "Accept-Language": "en-IN,en;q=0.9",
-  "Referer": "https://www.amazon.in/",
-});
-
+// Backend configuration
 const BACKEND_API = `${process.env.BACKEND_URL}/product/add-product`;
 const MAX_RETRIES = 3;
 const PAGE_LIMIT = 3;
@@ -26,36 +21,13 @@ const globalProcessedASINs = new Set();
 
 const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
-
 const categories = [
   { name: "Electronics", url: "https://www.amazon.in/s?rh=n:976419031,p_n_deal_type:26921224031" },
   { name: "Mobile Phones", url: "https://www.amazon.in/s?rh=n:1389401031,p_n_deal_type:26921224031" },
   { name: "Books", url: "https://www.amazon.in/s?rh=n:976389031,p_n_deal_type:26921224031" },
   { name: "Home & Kitchen", url: "https://www.amazon.in/s?rh=n:976442031,p_n_deal_type:26921224031" },
-  { name: "Fashion", url: "https://www.amazon.in/s?rh=n:1968024031,p_n_deal_type:26921224031" },
-  { name: "Beauty", url: "https://www.amazon.in/s?rh=n:1355016031,p_n_deal_type:26921224031" },
-  { name: "Toys", url: "https://www.amazon.in/s?rh=n:1350380031,p_n_deal_type:26921224031" },
-  { name: "Sports", url: "https://www.amazon.in/s?rh=n:1984443031,p_n_deal_type:26921224031" },
-  { name: "Computers", url: "https://www.amazon.in/s?rh=n:976392031,p_n_deal_type:26921224031" },
-  { name: "Baby", url: "https://www.amazon.in/s?rh=n:1571274031,p_n_deal_type:26921224031" },
-  { name: "Grocery", url: "https://www.amazon.in/s?rh=n:2454178031,p_n_deal_type:26921224031" },
-  { name: "Gaming Laptops", url: "https://www.amazon.in/s?rh=n:1375424031,p_n_deal_type:26921224031" },
-  { name: "Gaming Consoles", url: "https://www.amazon.in/s?rh=n:40910948031,p_n_deal_type:26921224031" },
-  { name: "Headphones & Earphones", url: "https://www.amazon.in/s?rh=n:1389432031,p_n_deal_type:26921224031" },
-  { name: "PC Accessories", url: "https://www.amazon.in/s?rh=n:1375345031,p_n_deal_type:26921224031" },
-  { name: "Mobile Accessories", url: "https://www.amazon.in/s?rh=n:1805560031,p_n_deal_type:26921224031" },
-  { name: "Cameras", url: "https://www.amazon.in/s?rh=n:1389396031,p_n_deal_type:26921224031" },
-  { name: "Smart Watches", url: "https://www.amazon.in/s?rh=n:1571271031,p_n_deal_type:26921224031" },
-  { name: "Televisions", url: "https://www.amazon.in/s?rh=n:1389396031,p_n_deal_type:26921224031" },
-  { name: "External Storage", url: "https://www.amazon.in/s?rh=n:1375342031,p_n_deal_type:26921224031" },
-  { name: "Gaming Accessories", url: "https://www.amazon.in/s?rh=n:40910948031,p_n_deal_type:26921224031" },
-  { name: "Bluetooth Speakers", url: "https://www.amazon.in/s?rh=n:1389401031,p_n_deal_type:26921224031" },
-  { name: "Smart Home Devices", url: "https://www.amazon.in/s?rh=n:14644992031,p_n_deal_type:26921224031" },
-  { name: "Kitchen Appliances", url: "https://www.amazon.in/s?rh=n:1380365031,p_n_deal_type:26921224031" },
-  { name: "Office Furniture", url: "https://www.amazon.in/s?rh=n:3591666031,p_n_deal_type:26921224031" },
+  // ... (rest of your categories)
 ];
-
-
 
 const isSupportedProduct = (url) => ![
   /\/ebook\//i, /-Kindle/i, /\/digital\//i, /\/video\//i, /\/music\//i,
@@ -76,6 +48,7 @@ const retryRequest = async (fn, maxTries = MAX_RETRIES) => {
       await delay(1000 * (i + 1));
     }
   }
+  throw new Error('Max retries exceeded');
 };
 
 const sendProductToBackend = async (url) => {
@@ -91,56 +64,104 @@ const sendProductToBackend = async (url) => {
   }
 };
 
-const parseProductsFromHTML = ($) => {
-  const productUrls = [];
-  $("div[data-component-type='s-search-result']").each((_, el) => {
-    const href = $(el).find("a.a-link-normal.s-no-outline").attr("href");
-    if (href?.startsWith("/")) {
-      const url = `https://www.amazon.in${href.split("?")[0]}`;
-      if (isSupportedProduct(url)) productUrls.push(url);
-    }
+const launchBrowser = async () => {
+  return puppeteer.launch({
+    headless: true,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--disable-gpu',
+      '--single-process'
+    ],
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
   });
-  return productUrls;
 };
 
-const scrapeCategoryPage = async (url, categoryName, pageNum) => {
+const scrapeCategoryPage = async (url, categoryName, pageNum, browser) => {
   console.log(`📝 Scraping ${categoryName} - Page ${pageNum}`);
-  const res = await retryRequest(() =>
-    axios.get(`${url}&page=${pageNum}`, { headers: getHeaders() })
-  );
-  const $ = cheerio.load(res.data);
-  const urls = parseProductsFromHTML($);
-  const newUrls = urls
-    .map((url) => ({ url, asin: extractASIN(url) }))
-    .filter(({ asin }) => asin && !globalProcessedASINs.has(asin));
+  const page = await browser.newPage();
+  
+  try {
+    await page.setRequestInterception(true);
+    page.on('request', (req) => {
+      if (['image', 'stylesheet', 'font', 'media'].includes(req.resourceType())) {
+        req.abort();
+      } else {
+        req.continue();
+      }
+    });
 
-  for (const { asin } of newUrls) globalProcessedASINs.add(asin);
-  return newUrls.map(({ url }) => url);
+    await page.setUserAgent(getRandomUserAgent());
+    await page.setExtraHTTPHeaders({
+      'Accept-Language': 'en-IN,en;q=0.9',
+      'Referer': 'https://www.amazon.in/',
+    });
+
+    await page.goto(`${url}&page=${pageNum}`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000
+    });
+
+    // Check for captcha
+    if (await page.$('#captchacharacters')) {
+      throw new Error('CAPTCHA encountered');
+    }
+
+    const productUrls = await page.$$eval(
+      "div[data-component-type='s-search-result'] a.a-link-normal.s-no-outline",
+      (links) => links.map((link) => link.href)
+    );
+
+    return productUrls
+      .map((url) => ({ url, asin: extractASIN(url) }))
+      .filter(({ url, asin }) => 
+        asin && 
+        !globalProcessedASINs.has(asin) && 
+        isSupportedProduct(url)
+      );
+
+  } finally {
+    await page.close();
+  }
 };
 
 const fetchAmazonDealsByCategory = async () => {
   console.log("🚀 Scraper started...");
+  const browser = await launchBrowser();
 
-  for (const { name, url } of categories) {
-    console.log(`📂 Category: ${name}`);
-    for (let page = 1; page <= PAGE_LIMIT; page++) {
-      try {
-        const productUrls = await scrapeCategoryPage(url, name, page);
-        const tasks = productUrls.slice(0, 10).map((url) =>
-          sendProductToBackend(url).then(() => delay(1000))
-        );
-        await Promise.allSettled(tasks);
+  try {
+    for (const { name, url } of categories) {
+      console.log(`📂 Category: ${name}`);
+      
+      for (let page = 1; page <= PAGE_LIMIT; page++) {
+        try {
+          const products = await retryRequest(() =>
+            scrapeCategoryPage(url, name, page, browser)
+          );
 
-        await delay(3000);
-      } catch (err) {
-        console.warn(`❌ Skipped ${name} page ${page}:`, err.message);
-        break;
+          for (const { asin } of products) {
+            globalProcessedASINs.add(asin);
+          }
+
+          for (const { url } of products.slice(0, 10)) {
+            await sendProductToBackend(url);
+            await delay(1000);
+          }
+
+          await delay(3000);
+        } catch (err) {
+          console.warn(`❌ Skipped ${name} page ${page}:`, err.message);
+          break;
+        }
       }
     }
+  } finally {
+    await browser.close();
+    console.log("🎉 Scraping completed.");
+    console.log(`📊 Total unique products sent: ${globalProcessedASINs.size}`);
   }
-
-  console.log("🎉 Scraping completed.");
-  console.log(`📊 Total unique products sent: ${globalProcessedASINs.size}`);
 };
 
 export default fetchAmazonDealsByCategory;

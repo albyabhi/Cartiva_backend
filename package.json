@@ -4,7 +4,9 @@
   "description": "��#\u0000 \u0000C\u0000a\u0000r\u0000t\u0000i\u0000v\u0000a\u0000_\u0000b\u0000a\u0000c\u0000k\u0000e\u0000n\u0000d\u0000\r\u0000 \u0000",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+     "start": "node index.js",
+    "build": "echo 'No build needed for plain JS'"
   },
   "keywords": [],
   "author": "",
@@ -20,6 +22,7 @@
     "node-cron": "^4.0.5",
     "node-telegram-bot-api": "^0.66.0",
     "playwright": "^1.52.0",
+    "puppeteer": "^24.10.2",
     "socks-proxy-agent": "^8.0.5"
   }
 }
